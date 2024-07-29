@@ -1,0 +1,72 @@
+const express = require('express');
+const axios = require('axios');
+
+const app = express();
+const port = 9871;
+
+let windowSize = 10;
+let numberWindow = [];
+
+// Provided token
+const token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJNYXBDbGFpbXMiOnsiZXhwIjoxNzIyMjQyMzYyLCJpYXQiOjE3MjIyNDIwNjIsImlzcyI6IkFmZm9yZG1lZCIsImp0aSI6IjM0M2QzZTM2LTI5MzAtNDM0MS1iNzU2LTY2NDYxZmU4Nzg0YSIsInN1YiI6ImF5Z3VwdGExNEBnbWFpbC5jb20ifSwiY29tcGFueU5hbWUiOiJhbWl0eXVuaXZlcnNpdHlub2lkYSIsImNsaWVudElEIjoiMzQzZDNlMzYtMjkzMC00MzQxLWI3NTYtNjY0NjFmZTg3ODRhIiwiY2xpZW50U2VjcmV0IjoiWkZpQVhwWGNRbXdhbVRSQiIsIm93bmVyTmFtZSI6ImF5dXNoZ3VwdGEiLCJvd25lckVtYWlsIjoiYXlndXB0YTE0QGdtYWlsLmNvbSIsInJvbGxObyI6IkEyMzA1MzIxMDM1In0.bEBxYcuGo01wdNPgiEHuMq_Lms1g6nUWxoNIdEZtd7g";
+
+// Helper function to fetch numbers from the test server
+const fetchNumbers = async (type) => {
+  const endpoints = {
+    p: 'http://20.244.56.144/test/primes',
+    f: 'http://20.244.56.144/test/fibo',
+    e: 'http://20.244.56.144/test/even',
+    r: 'http://20.244.56.144/test/rand',
+  };
+
+  try {
+    const response = await axios.get(endpoints[type], {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      timeout: 5000
+    });
+    console.log(`Response for type ${type}:`, response.data); // Log the response for debugging
+    return response.data.numbers;
+  } catch (error) {
+    console.error('Error fetching numbers:', error.message);
+    return [];
+  }
+};
+
+// Helper function to calculate the average
+const calculateAverage = (numbers) => {
+  if (numbers.length === 0) return 0;
+  const sum = numbers.reduce((a, b) => a + b, 0);
+  return (sum / numbers.length).toFixed(2);
+};
+
+// API endpoint
+app.get('/numbers/:type', async (req, res) => {
+  const { type } = req.params;
+  const validTypes = ['p', 'f', 'e', 'r'];
+
+  if (!validTypes.includes(type)) {
+    return res.status(400).json({ error: 'Invalid number type' });
+  }
+
+  const fetchedNumbers = await fetchNumbers(type);
+  const uniqueNumbers = [...new Set([...numberWindow, ...fetchedNumbers])];
+
+  const previousState = [...numberWindow];
+  numberWindow = uniqueNumbers.slice(-windowSize);
+
+  const average = calculateAverage(numberWindow);
+
+  res.json({
+    numbers: fetchedNumbers,
+    windowPrevState: previousState,
+    windowCurrState: numberWindow,
+    avg: average,
+  });
+});
+
+app.listen(port, () => {
+  console.log(`Server running at http://localhost:${port}`);
+});
+
